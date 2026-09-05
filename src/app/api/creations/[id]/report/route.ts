@@ -2,7 +2,8 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { creations, reports } from "@/lib/db/schema";
 import { requireUser } from "@/lib/user";
-import { ok, fail } from "@/lib/api";
+import { rateLimit } from "@/lib/ratelimit";
+import { ok, fail, tooMany, readJson, isUuid, mapRouteError } from "@/lib/api";
 
 const AUTO_HIDE_THRESHOLD = 3;
 
@@ -10,7 +11,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   try {
     const user = await requireUser();
     const { id } = await ctx.params;
-    const body = (await req.json().catch(() => ({}))) as { reason?: string };
+    if (!isUuid(id)) return fail("NOT_FOUND", "Creation not found.", 404);
+    const limit = await rateLimit("report", user.id);
+    if (!limit.allowed) return tooMany(limit.retryAfterSec, "Too many reports.");
+    const body = await readJson<{ reason?: string }>(req);
     const reason = (body.reason ?? "").slice(0, 500);
 
     const target = (
@@ -39,9 +43,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
     return ok({ reported: true });
   } catch (err) {
-    if (err instanceof Error && err.message === "BANNED") {
-      return fail("BANNED", "Nope.", 403);
-    }
+    const mapped = mapRouteError(err);
+    if (mapped) return mapped;
     throw err;
   }
 }

@@ -7,18 +7,18 @@ import { PATCH } from "@/lib/champions";
 import { currentWeekKey } from "@/lib/weeks";
 import { isCleanText, GENERIC_REJECT_MESSAGE } from "@/lib/profanity";
 import { rateLimit } from "@/lib/ratelimit";
-import { ok, fail, ApiError } from "@/lib/api";
+import { ok, fail, tooMany, readJson, mapRouteError } from "@/lib/api";
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireUser();
     const { id } = await ctx.params;
     const limit = await rateLimit("publish", user.id);
-    if (!limit.allowed) return fail("RATE_LIMITED", "Too many publishes. Cool off a bit.", 429);
+    if (!limit.allowed) return tooMany(limit.retryAfterSec, "Too many publishes. Cool off a bit.");
 
     // Only name/tagline are read. Any client-sent champion ids are structurally
     // ignored (AC §2.5) — the row is built from the server-held draft.
-    const body = (await req.json().catch(() => ({}))) as { name?: string; tagline?: string };
+    const body = await readJson<{ name?: string; tagline?: string }>(req);
     const name = (body.name ?? "").trim();
     const tagline = (body.tagline ?? "").trim();
 
@@ -62,10 +62,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const author = (await db.select().from(users).where(eq(users.id, user.id)).limit(1))[0];
     return ok({ creationId: inserted.id }, { status: 201 });
   } catch (err) {
-    if (err instanceof Error && err.message === "BANNED") {
-      return fail("BANNED", "Nope.", 403);
-    }
-    if (err instanceof ApiError) return fail(err.code, err.message, err.status);
+    const mapped = mapRouteError(err);
+    if (mapped) return mapped;
     throw err;
   }
 }

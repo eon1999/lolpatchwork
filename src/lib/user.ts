@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { randomDisplayName } from "@/lib/displayName";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const UID_COOKIE = "uid";
 const YEAR_MS = 365 * 24 * 3600 * 1000;
@@ -75,6 +76,10 @@ export async function requireUser(): Promise<SessionUser> {
     if (existing.isBanned) throw new Error("BANNED");
     return existing;
   }
+  // Cookie-less clients would otherwise mint a fresh user (and a fresh rate
+  // limit identity) on every request — cap minting per IP first.
+  const mint = await rateLimit("mint", await clientIpHash());
+  if (!mint.allowed) throw new Error("RATE_LIMITED");
   const inserted = await db
     .insert(users)
     .values({

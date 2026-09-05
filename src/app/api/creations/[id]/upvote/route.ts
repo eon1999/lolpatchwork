@@ -3,14 +3,14 @@ import { db } from "@/lib/db";
 import { creations, upvotes } from "@/lib/db/schema";
 import { requireUser } from "@/lib/user";
 import { rateLimit } from "@/lib/ratelimit";
-import { ok, fail } from "@/lib/api";
+import { ok, fail, tooMany, mapRouteError } from "@/lib/api";
 
 export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireUser();
     const { id } = await ctx.params;
     const limit = await rateLimit("upvote", user.id);
-    if (!limit.allowed) return fail("RATE_LIMITED", "Easy there.", 429);
+    if (!limit.allowed) return tooMany(limit.retryAfterSec, "Easy there.");
 
     const target = (
       await db.select().from(creations).where(eq(creations.id, id)).limit(1)
@@ -49,9 +49,8 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
 
     return ok(result);
   } catch (err) {
-    if (err instanceof Error && err.message === "BANNED") {
-      return fail("BANNED", "Nope.", 403);
-    }
+    const mapped = mapRouteError(err);
+    if (mapped) return mapped;
     throw err;
   }
 }

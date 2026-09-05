@@ -2,9 +2,10 @@ import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { creations, upvotes, users } from "@/lib/db/schema";
 import { toCard } from "@/lib/creations";
-import { getUser } from "@/lib/user";
+import { getUser, clientIpHash } from "@/lib/user";
 import { currentWeekKey, weekKeyToDate } from "@/lib/weeks";
-import { ok } from "@/lib/api";
+import { rateLimit } from "@/lib/ratelimit";
+import { ok, tooMany, mapRouteError } from "@/lib/api";
 
 type Sort = "new" | "top" | "week";
 const EIGHT_WEEKS_MS = 8 * 7 * 24 * 3600 * 1000;
@@ -24,7 +25,10 @@ function decodeCursor(s: string | null): Cursor | null {
 }
 
 export async function GET(req: Request) {
-  const url = new URL(req.url);
+  try {
+    const limited = await rateLimit("read", await clientIpHash());
+    if (!limited.allowed) return tooMany(limited.retryAfterSec, "Slow down.");
+    const url = new URL(req.url);
   const sort = (url.searchParams.get("sort") ?? "new") as Sort;
   const cursor = decodeCursor(url.searchParams.get("cursor"));
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 24), 1), 50);
@@ -110,4 +114,9 @@ export async function GET(req: Request) {
   }
 
   return ok({ items, nextCursor });
+  } catch (err) {
+    const mapped = mapRouteError(err);
+    if (mapped) return mapped;
+    throw err;
+  }
 }

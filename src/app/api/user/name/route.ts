@@ -3,14 +3,14 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/user";
 import { isCleanText, GENERIC_REJECT_MESSAGE } from "@/lib/profanity";
-import { ok, fail } from "@/lib/api";
+import { ok, fail, readJson, mapRouteError } from "@/lib/api";
 
 const RENAME_COOLDOWN_MS = 24 * 3600 * 1000;
 
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
-    const body = (await req.json().catch(() => ({}))) as { name?: string };
+    const body = await readJson<{ name?: string }>(req);
     const name = (body.name ?? "").trim();
     if (name.length < 1 || name.length > 24) {
       return fail("BAD_NAME", "Name must be 1-24 characters.", 400);
@@ -33,9 +33,8 @@ export async function POST(req: Request) {
       .where(eq(users.id, user.id));
     return ok({ name });
   } catch (err) {
-    if (err instanceof Error && err.message === "BANNED") {
-      return fail("BANNED", "Nope.", 403);
-    }
+    const mapped = mapRouteError(err);
+    if (mapped) return mapped;
     throw err;
   }
 }

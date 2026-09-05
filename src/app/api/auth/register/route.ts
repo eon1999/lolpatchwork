@@ -5,7 +5,7 @@ import { requireUser, clientIpHash } from "@/lib/user";
 import { hashPassword, normalizeUsername, validatePassword } from "@/lib/auth";
 import { isCleanText, GENERIC_REJECT_MESSAGE } from "@/lib/profanity";
 import { rateLimit } from "@/lib/ratelimit";
-import { ok, fail } from "@/lib/api";
+import { ok, fail, tooMany, readJson, mapRouteError } from "@/lib/api";
 
 function isUniqueViolation(err: unknown): boolean {
   return typeof err === "object" && err !== null && "code" in err && err.code === "23505";
@@ -18,12 +18,12 @@ function isUniqueViolation(err: unknown): boolean {
 export async function POST(req: Request) {
   try {
     const limited = await rateLimit("auth", await clientIpHash());
-    if (!limited.allowed) return fail("RATE_LIMITED", "Too many attempts. Wait a bit.", 429);
+    if (!limited.allowed) return tooMany(limited.retryAfterSec, "Too many attempts. Wait a bit.");
 
-    const body = (await req.json().catch(() => ({}))) as {
+    const body = await readJson<{
       username?: unknown;
       password?: unknown;
-    };
+    }>(req);
     const username = normalizeUsername(body.username);
     if (!username.ok) return fail("BAD_USERNAME", username.message, 400);
     const password = validatePassword(body.password);
@@ -58,7 +58,8 @@ export async function POST(req: Request) {
       throw err;
     }
   } catch (err) {
-    if (err instanceof Error && err.message === "BANNED") return fail("BANNED", "Nope.", 403);
+    const mapped = mapRouteError(err);
+    if (mapped) return mapped;
     throw err;
   }
 }

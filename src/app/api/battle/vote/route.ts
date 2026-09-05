@@ -6,18 +6,18 @@ import { parsePairToken } from "@/lib/pairToken";
 import { updateRatings } from "@/lib/elo";
 import { currentWeekKey } from "@/lib/weeks";
 import { rateLimit } from "@/lib/ratelimit";
-import { ok, fail } from "@/lib/api";
+import { ok, fail, tooMany, readJson, mapRouteError } from "@/lib/api";
 
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
     const limit = await rateLimit("battleVote", user.id);
-    if (!limit.allowed) return fail("RATE_LIMITED", "Too many votes.", 429);
+    if (!limit.allowed) return tooMany(limit.retryAfterSec, "Too many votes.");
 
-    const body = (await req.json().catch(() => ({}))) as {
+    const body = await readJson<{
       pairToken?: string;
       winner?: "a" | "b" | "skip";
-    };
+    }>(req);
     if (!body.pairToken || !body.winner) {
       return fail("BAD_REQUEST", "Missing pairToken or winner.", 400);
     }
@@ -93,9 +93,8 @@ export async function POST(req: Request) {
       split: { aPercent: aPct, bPercent: 100 - aPct, total: splitRows.total },
     });
   } catch (err) {
-    if (err instanceof Error && err.message === "BANNED") {
-      return fail("BANNED", "Nope.", 403);
-    }
+    const mapped = mapRouteError(err);
+    if (mapped) return mapped;
     throw err;
   }
 }
