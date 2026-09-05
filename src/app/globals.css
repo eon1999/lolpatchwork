@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@theme {
+  --color-abyss: #071019;
+  --color-deep: #0a1626;
+  --color-panel: #0e1f33;
+  --color-panel-raised: #13293f;
+  --color-edge: #1f3a55;
+  --color-gold: #c8aa6e;
+  --color-gold-bright: #f0e6d2;
+  --color-teal: #0ac8b9;
+  --color-blood: #be1e37;
+  --color-muted: #7a8b9e;
+  /* League has no …, — or ’, so the stack behind it catches those. */
+  --font-display: var(--font-league), ui-serif, Georgia, serif;
+  --font-body: var(--font-league), ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-body);
+  background:
+    radial-gradient(1200px 600px at 50% -200px, #10233b 0%, transparent 60%),
+    var(--color-abyss);
+  color: var(--color-gold-bright);
+  min-height: 100dvh;
+}
+
+::selection {
+  background: var(--color-gold);
+  color: var(--color-abyss);
+}
+
+.reel-mask {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 18%,
+    black 82%,
+    transparent 100%
+  );
+}
+
+.reel-mask-x {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 18%,
+    black 82%,
+    transparent 100%
+  );
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(200, 170, 110, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(200, 170, 110, 0);
+  }
+}
+
+.slot-glow {
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+/* Revolver chambers: a filled one reads as spent, an open one invites a click. */
+.chamber-filled {
+  filter: saturate(0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-glow {
+    animation: none;
+  }
+}
+
+/*
+ * Battle arena. anime owns the cards' transforms through the clash, so the
+ * verdict's brightening and dimming is left to CSS transitions on data-outcome.
+ */
+.battle-card {
+  position: relative;
+  transition:
+    filter 520ms ease,
+    box-shadow 520ms ease,
+    border-color 520ms ease;
+}
+
+.battle-card[data-outcome="win"] {
+  z-index: 20;
+  filter: brightness(1.22) saturate(1.12);
+  border-color: var(--color-gold);
+  box-shadow: 0 0 70px -10px rgba(200, 170, 110, 0.75);
+}
+
+.battle-card[data-outcome="lose"] {
+  filter: brightness(0.42) saturate(0.3);
+}
+
+.battle-spark {
+  background: radial-gradient(
+    circle,
+    rgba(240, 230, 210, 0.95) 0%,
+    rgba(200, 170, 110, 0.55) 45%,
+    transparent 70%
+  );
+}
