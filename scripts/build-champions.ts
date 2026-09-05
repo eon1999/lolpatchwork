@@ -86,8 +86,14 @@ async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>)
 }
 
 async function main() {
-  const override = process.env.DDRAGON_VERSION;
-  const patch = override ?? (await fetchJson<string[]>(`${BASE}/api/versions.json`))[0];
+  const override = process.env.DDRAGON_VERSION?.trim();
+  let patch = override;
+  if (!patch) {
+    // versions.json intermittently serves a leading empty string — skip those.
+    const versions = await fetchJson<string[]>(`${BASE}/api/versions.json`);
+    patch = versions.find((v) => /^\d+\.\d+\.\d+$/.test(v));
+    if (!patch) throw new Error(`No valid patch in versions.json: ${JSON.stringify(versions.slice(0, 5))}`);
+  }
   console.log(`Data Dragon patch: ${patch}${override ? " (pinned via env)" : " (latest)"}`);
 
   const summary = await fetchJson<{ data: Record<string, ChampionSummary> }>(
