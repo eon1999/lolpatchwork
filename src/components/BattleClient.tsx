@@ -163,6 +163,20 @@ export default function BattleClient() {
     return (
       <div className="py-20 text-center">
         <p className="text-sm text-muted">{error}</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-3">
+          <button
+            onClick={() => void loadPair()}
+            className="rounded-lg border border-gold/60 bg-panel px-4 py-2 font-display tracking-wide text-gold transition-colors hover:bg-gold/10"
+          >
+            TRY AGAIN
+          </button>
+          <Link
+            href="/gallery"
+            className="rounded-lg border border-edge px-4 py-2 font-display tracking-wide text-muted transition-colors hover:border-muted hover:text-gold-bright"
+          >
+            GALLERY
+          </Link>
+        </div>
       </div>
     );
   }

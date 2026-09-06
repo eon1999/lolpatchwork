@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     if (!user || !matches) return fail("BAD_CREDENTIALS", BAD_CREDENTIALS, 401);
     if (user.isBanned) return fail("BANNED", "Nope.", 403);
 
-    await setUidCookie(user.id);
+    await setUidCookie(user.id, true);
     return ok({ username: user.username, displayName: user.displayName });
   } catch (err) {
     const mapped = mapRouteError(err);

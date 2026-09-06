@@ -79,6 +79,7 @@ export const creations = pgTable(
     index("creations_new_idx").on(t.createdAt.desc()).where(sql`not ${t.isHidden}`),
     index("creations_week_idx").on(t.weekKey, t.isHidden),
     index("creations_rating_idx").on(t.rating).where(sql`not ${t.isHidden}`),
+    index("creations_user_idx").on(t.userId, t.createdAt.desc()).where(sql`not ${t.isHidden}`),
     check("creations_name_len", sql`char_length(${t.name}) between 1 and 24`),
   ],
 );

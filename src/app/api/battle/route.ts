@@ -13,7 +13,11 @@ export async function GET() {
     const pairLimit = await rateLimit("pair", user.id);
     if (!pairLimit.allowed) return tooMany(pairLimit.retryAfterSec, "Too many pairs.");
     const pair = await pickPair(user.id);
-    if (!pair) return fail("EMPTY_POOL", "No creations to battle yet.", 503);
+    if (pair.status !== "ok") {
+      return pair.reason === "seen"
+        ? fail("ALL_SEEN", "You've judged every matchup out there. New ones appear as creations drop.", 503)
+        : fail("EMPTY_POOL", "No creations to battle yet.", 503);
+    }
     const authorA = (
       await db.select().from(users).where(eq(users.id, pair.a.userId)).limit(1)
     )[0];

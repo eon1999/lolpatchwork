@@ -1,0 +1,1 @@
+CREATE INDEX "creations_user_idx" ON "creations" USING btree ("user_id","created_at" DESC NULLS LAST) WHERE not "creations"."is_hidden";

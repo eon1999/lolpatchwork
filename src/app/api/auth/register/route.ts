@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { requireUser, clientIpHash } from "@/lib/user";
+import { requireUser, setUidCookie, clientIpHash } from "@/lib/user";
 import { hashPassword, normalizeUsername, validatePassword } from "@/lib/auth";
 import { isCleanText, GENERIC_REJECT_MESSAGE } from "@/lib/profanity";
 import { rateLimit } from "@/lib/ratelimit";
@@ -51,6 +51,9 @@ export async function POST(req: Request) {
         })
         .where(eq(users.id, user.id))
         .returning({ username: users.username, displayName: users.displayName });
+      // Claiming upgrades the session cookie from browser-session to persistent,
+      // so the inventory survives leaving.
+      await setUidCookie(user.id, true);
       return ok({ username: updated[0].username, displayName: updated[0].displayName });
     } catch (err) {
       // Unique index lost the race with a concurrent signup for the same name.

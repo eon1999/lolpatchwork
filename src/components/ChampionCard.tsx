@@ -66,9 +66,9 @@ export function ChampionCardThumb({ card }: { card: CreationCardDTO }) {
 
 export function ChampionCardFull({ card }: { card: CreationCardDTO }) {
   return (
-    <article className="overflow-hidden rounded-xl border border-edge/70 bg-panel shadow-2xl shadow-black/40">
+    <article className="rounded-xl border border-edge/70 bg-panel shadow-2xl shadow-black/40">
       <div className="flex flex-col md:flex-row">
-        <div className="relative w-full shrink-0 md:w-72">
+        <div className="relative w-full shrink-0 overflow-hidden rounded-t-xl md:w-72 md:rounded-l-xl md:rounded-tr-none">
           <div className="relative h-64 w-full md:h-full md:min-h-[480px]">
             <Image
               src={card.model.loading}
@@ -104,13 +104,17 @@ export function ChampionCardFull({ card }: { card: CreationCardDTO }) {
               return (
                 <AbilityRow
                   key={key}
+                  slot={key}
                   slotLabel={label}
+                  championId={slot.championId}
                   abilityName={slot.abilityName}
                   icon={slot.icon}
                   championName={slot.championName}
                   championSquare={slot.championSquare}
                   description={slot.description}
                   cooldown={slot.cooldown}
+                  cost={slot.cost}
+                  range={slot.range}
                 />
               );
             })}

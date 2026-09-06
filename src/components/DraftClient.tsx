@@ -8,8 +8,11 @@ import RollStage from "@/components/draft/RollStage";
 import ClampTransition from "@/components/ClampTransition";
 import PublishForm from "@/components/draft/PublishForm";
 import ReleasedCard from "@/components/draft/ReleasedCard";
+import RollStylePicker from "@/components/draft/RollStylePicker";
+import ScatterStage from "@/components/draft/ScatterStage";
 import { getChampion, SLOT_KEYS, type Champion, type SlotKey } from "@/lib/champions";
 import { randomFlavorLine } from "@/lib/flavor";
+import { useRollStyle } from "@/lib/rollStyle";
 import type { CreationCard } from "@/lib/creations";
 
 /**
@@ -49,6 +52,10 @@ export default function DraftClient() {
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
   const [publishing, setPublishing] = useState(false);
+  const [rollStyle] = useRollStyle();
+  /** Read inside revealNext without churning its identity on every switch. */
+  const rollStyleRef = useRef(rollStyle);
+  rollStyleRef.current = rollStyle;
 
   const dockPortraitRef = useRef<HTMLDivElement>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,6 +93,8 @@ export default function DraftClient() {
         const data = await call(`/api/draft/${id}/reveal`);
         setCurrent(data.champion as Champion);
         setRound(data.index + 1);
+        // Insta roll: no stage, the champion goes straight to the dock.
+        if (rollStyleRef.current === "insta") setPhase("placing");
         return true;
       } catch (err) {
         setError(err instanceof Error ? err.message : "Reveal failed.");
@@ -217,7 +226,15 @@ export default function DraftClient() {
   }
 
   // The roll stays hidden until the curtain has actually lifted off it.
-  const rolling = phase === "rolling" && curtainUp;
+  const rolling = phase === "rolling" && curtainUp && rollStyle !== "insta";
+
+  // Flipping to insta while a roll is mid-flight must not strand the draft:
+  // the reveal already landed, so dock it immediately.
+  useEffect(() => {
+    if (rollStyle === "insta" && phase === "rolling" && current) {
+      setPhase("placing");
+    }
+  }, [rollStyle, phase, current]);
 
   return (
     <>
@@ -227,6 +244,7 @@ export default function DraftClient() {
         <PublishForm
           name={name}
           tagline={tagline}
+          assignments={assignments}
           publishing={publishing}
           error={error}
           onNameChange={setName}
@@ -261,16 +279,31 @@ export default function DraftClient() {
 
           {error && <p className="mt-3 text-center text-sm text-blood">{error}</p>}
 
-          {rolling && (
-            <RollStage
-              key={round}
-              champion={current}
-              dockRef={dockPortraitRef}
-              onDocked={() => setPhase("placing")}
-            />
-          )}
+          {rolling &&
+            (rollStyle === "scatter" ? (
+              <ScatterStage
+                key={round}
+                champion={current}
+                dockRef={dockPortraitRef}
+                onDocked={() => setPhase("placing")}
+              />
+            ) : (
+              <RollStage
+                key={round}
+                champion={current}
+                dockRef={dockPortraitRef}
+                onDocked={() => setPhase("placing")}
+              />
+            ))}
 
-          <ChampionDock ref={dockPortraitRef} champion={current} visible={phase === "placing"} />
+          <ChampionDock
+            ref={dockPortraitRef}
+            champion={current}
+            visible={phase === "placing"}
+            pop={rollStyle === "insta"}
+          />
+
+          <RollStylePicker />
 
           {undo && (
             <div className="fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-full border border-gold/60 bg-panel-raised px-5 py-2.5 text-sm text-gold-bright shadow-xl">

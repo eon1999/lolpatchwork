@@ -1,27 +1,50 @@
 "use client";
 
 import Image from "next/image";
-import { forwardRef, useEffect, useRef, useState } from "react";
-import { animate, stagger } from "animejs";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { animate, cubicBezier, stagger, utils } from "animejs";
 import AbilityPopup from "@/components/draft/AbilityPopup";
-import { ABILITY_SLOTS, type Champion, type SlotKey } from "@/lib/champions";
+import { ABILITY_SLOTS, CHAMPION_IDS, getChampion, type Champion, type SlotKey } from "@/lib/champions";
 
 export type ChampionDockProps = {
   champion: Champion | null;
   /** Hidden while the roll is still flying towards the dock. */
   visible: boolean;
+  /** Insta roll: the dock snaps in and the portrait does one fast slot spin. */
+  pop?: boolean;
 };
+
+const PORTRAIT_PX = 56;
+const SPIN_ITEMS = 6;
+const SPIN_MS = 340;
+
+function randomDecor() {
+  const id = CHAMPION_IDS[Math.floor(Math.random() * CHAMPION_IDS.length)];
+  return { src: getChampion(id)!.square, alt: id };
+}
 
 /**
  * The rolled champion, parked bottom-left once the reel lands: portrait, then the
  * abilities spanning left to right, passive through R. Any of them opens a popup.
  */
 const ChampionDock = forwardRef<HTMLDivElement, ChampionDockProps>(function ChampionDock(
-  { champion, visible },
+  { champion, visible, pop },
   portraitRef,
 ) {
   const [openSlot, setOpenSlot] = useState<Exclude<SlotKey, "model"> | null>(null);
   const stripRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const spinRef = useRef<HTMLDivElement>(null);
+  const flashRef = useRef<HTMLDivElement>(null);
+
+  // The mini slot strip for insta rolls: decor icons with the winner last.
+  const spinStrip = useMemo(() => {
+    if (!champion) return null;
+    return [
+      ...Array.from({ length: SPIN_ITEMS }, randomDecor),
+      { src: champion.square, alt: champion.name },
+    ];
+  }, [champion]);
 
   // A new champion closes whatever was open and deals its abilities out.
   useEffect(() => {
@@ -32,11 +55,52 @@ const ChampionDock = forwardRef<HTMLDivElement, ChampionDockProps>(function Cham
       opacity: [0, 1],
       translateX: [-18, 0],
       scale: [0.85, 1],
-      delay: stagger(60),
-      duration: 380,
+      delay: stagger(pop ? 32 : 60),
+      duration: pop ? 300 : 380,
       ease: "out(3)",
     });
-  }, [champion, visible]);
+  }, [champion, visible, pop]);
+
+  // Insta entrance: the dock pops and the portrait runs one compressed
+  // slot spin — same bezier, blur and overshoot as the big reel, ~0.5s total.
+  useEffect(() => {
+    if (!pop || !visible || !champion) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduced) {
+      if (spinRef.current) {
+        utils.set(spinRef.current, { translateY: -(SPIN_ITEMS * PORTRAIT_PX) });
+      }
+      return;
+    }
+
+    if (panelRef.current) {
+      animate(panelRef.current, {
+        scale: [0.86, 1],
+        translateX: [-26, 0],
+        duration: 300,
+        ease: "out(3)",
+      });
+    }
+
+    const spin = spinRef.current;
+    if (!spin) return;
+    const finalPos = -(SPIN_ITEMS * PORTRAIT_PX);
+
+    void (async () => {
+      await animate(spin, {
+        translateY: finalPos,
+        filter: ["blur(0px)", "blur(2.5px)", "blur(0px)"],
+        duration: SPIN_MS,
+        ease: cubicBezier(0.16, 0.9, 0.28, 1),
+      });
+      await animate(spin, { translateY: finalPos - 4, duration: 60, ease: "out(2)" });
+      await animate(spin, { translateY: finalPos, duration: 60, ease: "out(3)" });
+      if (flashRef.current) {
+        animate(flashRef.current, { opacity: [0.25, 0], duration: 140, ease: "out(2)" });
+      }
+    })();
+  }, [champion, visible, pop]);
 
   useEffect(() => {
     if (!openSlot) return;
@@ -67,7 +131,10 @@ const ChampionDock = forwardRef<HTMLDivElement, ChampionDockProps>(function Cham
       )}
 
       {/* Its own panel, so it never reads as text sitting on top of the footer. */}
-      <div className="rounded-2xl border border-edge/70 bg-panel-raised/92 p-2.5 shadow-2xl shadow-black/70 backdrop-blur">
+      <div
+        ref={panelRef}
+        className="rounded-2xl border border-edge/70 bg-panel-raised/92 p-2.5 shadow-2xl shadow-black/70 backdrop-blur"
+      >
         <div className="mb-2 flex items-baseline gap-2 px-0.5">
           <span className="font-display text-base leading-none tracking-wide text-gold-bright">
             {champion?.name ?? ""}
@@ -82,16 +149,42 @@ const ChampionDock = forwardRef<HTMLDivElement, ChampionDockProps>(function Cham
             ref={portraitRef}
             className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 border-gold/60 bg-deep"
           >
-            {champion && (
-              <Image
-                src={champion.square}
-                alt={champion.name}
-                fill
-                unoptimized
-                sizes="56px"
-                className="object-cover"
-              />
+            {champion && pop && spinStrip ? (
+              <div key={champion.id} ref={spinRef} className="flex flex-col will-change-transform">
+                {spinStrip.map((item, i) => (
+                  <span
+                    key={i}
+                    className="block shrink-0"
+                    style={{ width: PORTRAIT_PX, height: PORTRAIT_PX }}
+                  >
+                    <Image
+                      src={item.src}
+                      alt={item.alt}
+                      width={PORTRAIT_PX}
+                      height={PORTRAIT_PX}
+                      loading="eager"
+                      unoptimized
+                      className="h-full w-full object-cover"
+                    />
+                  </span>
+                ))}
+              </div>
+            ) : (
+              champion && (
+                <Image
+                  src={champion.square}
+                  alt={champion.name}
+                  fill
+                  unoptimized
+                  sizes="56px"
+                  className="object-cover"
+                />
+              )
             )}
+            <div
+              ref={flashRef}
+              className="pointer-events-none absolute inset-0 bg-white opacity-0"
+            />
           </div>
 
           {champion &&

@@ -49,14 +49,18 @@ export async function getUser(): Promise<SessionUser | null> {
   };
 }
 
-/** Point the session cookie at a user id (minting on signup, switching on login). */
-export async function setUidCookie(id: string): Promise<void> {
+/**
+ * Point the session cookie at a user id. Guest mints get a browser-session
+ * cookie — their inventory only lasts the session unless they claim an
+ * account, which re-sets the cookie as persistent.
+ */
+export async function setUidCookie(id: string, persistent = false): Promise<void> {
   const jar = await cookies();
   jar.set(UID_COOKIE, id, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: Math.floor(YEAR_MS / 1000),
+    ...(persistent ? { maxAge: Math.floor(YEAR_MS / 1000) } : {}),
     path: "/",
   });
 }

@@ -1,31 +1,55 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import AbilityPopup from "@/components/draft/AbilityPopup";
+import type { Ability, SlotKey } from "@/lib/champions";
 
 export type AbilityRowProps = {
+  slot: Exclude<SlotKey, "model">;
   slotLabel: string;
+  championId: string;
   abilityName: string;
   icon: string;
   championName: string;
   championSquare: string;
   description: string;
   cooldown?: string;
+  cost?: string;
+  range?: string;
 };
 
+/** One ability line on a creation card. Tapping it pops the explainer out
+ *  beside the row (like the battle card) instead of stretching the card. */
 export default function AbilityRow({
+  slot,
   slotLabel,
+  championId,
   abilityName,
   icon,
   championName,
   championSquare,
   description,
   cooldown,
+  cost,
+  range,
 }: AbilityRowProps) {
   const [open, setOpen] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: MouseEvent) {
+      if (!rowRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
+
+  const ability: Ability = { name: abilityName, description, icon, cooldown, cost, range };
 
   return (
-    <div className="border-t border-edge/50 py-2 first:border-t-0">
+    <div ref={rowRef} className="relative border-t border-edge/50 py-2 first:border-t-0">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 text-left"
@@ -58,9 +82,16 @@ export default function AbilityRow({
         </span>
       </button>
       {open && (
-        <p className="mt-2 ml-15 whitespace-pre-line border-l-2 border-gold/40 pl-3 text-xs leading-relaxed text-gold-bright/80">
-          {description}
-        </p>
+        <div className="absolute right-0 top-full z-40 mt-2">
+          <AbilityPopup
+            championId={championId}
+            championName={championName}
+            slot={slot}
+            ability={ability}
+            onClose={() => setOpen(false)}
+            origin="top right"
+          />
+        </div>
       )}
     </div>
   );

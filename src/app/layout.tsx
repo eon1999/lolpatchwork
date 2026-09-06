@@ -51,6 +51,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <Link className="hover:text-gold" href="/leaderboard">
                   Leaderboard
                 </Link>
+                <Link className="hover:text-gold" href="/mine">
+                  Mine
+                </Link>
               </div>
               <p className="max-w-4xl text-[11px] leading-relaxed text-muted/70">{LEGAL}</p>
             </div>
